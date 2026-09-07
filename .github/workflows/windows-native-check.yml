@@ -1,0 +1,49 @@
+name: Windows native deployment check
+
+on:
+  pull_request:
+    paths:
+      - "deploy-windows-native.ps1"
+      - "deploy-windows-native.cmd"
+      - "deploy/windows-native/**"
+      - "test/deploy/test_windows_native_deploy.py"
+      - ".github/workflows/windows-native-check.yml"
+  push:
+    paths:
+      - "deploy-windows-native.ps1"
+      - "deploy-windows-native.cmd"
+      - "deploy/windows-native/**"
+      - "test/deploy/test_windows_native_deploy.py"
+      - ".github/workflows/windows-native-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse the PowerShell entrypoint
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\deploy-windows-native.ps1),
+            [ref]$tokens,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
+      - name: Run deployment contract tests
+        shell: pwsh
+        run: python -m unittest test.deploy.test_windows_native_deploy -v
+
+      - name: Exercise the CMD wrapper
+        shell: cmd
+        run: deploy-windows-native.cmd -Action Status

@@ -56,6 +56,19 @@ Offline image packages can be built with `bash build.sh --package --target docke
 
 For detailed deployment instructions, see [Docker Installation](https://modelengine-group.github.io/nexent/en/quick-start/installation.html).
 
+### Native Windows test deployment (without Docker or WSL)
+
+Windows development machines can use the PowerShell entrypoint directly. This mode skips Supabase login by default but
+still requires native PostgreSQL, a Redis-compatible service, Elasticsearch, and MinIO:
+
+```powershell
+.\deploy-windows-native.ps1 -Action Doctor
+.\deploy-windows-native.ps1
+```
+
+See [`deploy/windows-native/README.md`](deploy/windows-native/README.md) for details. The local Skill sandbox is intended
+for trusted development and testing environments, not production.
+
 ### Kubernetes Deployment (For Enterprise Production)
 
 Ideal for enterprise scenarios requiring high availability and elastic scaling. Prerequisites: Kubernetes 1.24+ and Helm 3+:

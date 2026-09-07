@@ -64,7 +64,9 @@ _conversion_locks_guard = asyncio.Lock()
 
 logger = logging.getLogger("file_management_service")
 
-ALLOWED_SKILL_UPLOAD_ROOT = Path("/mnt/nexent").resolve()
+ALLOWED_SKILL_UPLOAD_ROOT = Path(
+    os.getenv("ALLOWED_SKILL_UPLOAD_ROOT", "/mnt/nexent")
+).resolve()
 
 
 def is_allowed_skill_upload_path(file_path: str) -> bool:

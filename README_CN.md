@@ -56,6 +56,19 @@ Docker 卸载入口为 `bash uninstall.sh docker`，默认交互确认是否删�
 
 详细部署指南请参考 [Docker 安装部署](https://modelengine-group.github.io/nexent/zh/quick-start/installation.html)。
 
+### Windows 原生测试部署（不使用 Docker/WSL）
+
+Windows 本地开发测试可直接使用 PowerShell 入口。该模式默认跳过 Supabase 登录，但仍需本机运行
+PostgreSQL、Redis 兼容服务、Elasticsearch 和 MinIO：
+
+```powershell
+.\deploy-windows-native.ps1 -Action Doctor
+.\deploy-windows-native.ps1
+```
+
+详细说明请查看 [`deploy/windows-native/README.zh-CN.md`](deploy/windows-native/README.zh-CN.md)。该模式使用本地
+Skill 沙箱，适合可信环境下的开发测试，不建议用于生产部署。
+
 ### Kubernetes 部署（适合企业级生产环境）
 
 适用于需要高可用、弹性扩展的企业场景。部署前需准备 Kubernetes 集群（1.24+）和 Helm 3+：

@@ -18,6 +18,30 @@ This guide distinguishes between full-stack development and SDK-only usage. Comp
 The project deployment scripts use Bash. Run deployment commands in Git Bash or WSL. Frontend and backend development commands can also be run separately in PowerShell.
 :::
 
+### Native Windows local testing (without Docker or WSL)
+
+The repository provides `deploy-windows-native.ps1` for installing application dependencies, initializing the database,
+and starting the Nexent Config, Runtime, MCP, and Web services directly from Windows PowerShell:
+
+```powershell
+# Check local dependencies and infrastructure first
+.\deploy-windows-native.ps1 -Action Doctor
+
+# Install, build, initialize the database, and start Nexent
+.\deploy-windows-native.ps1
+```
+
+This mode still requires native Windows installations of PostgreSQL, a Redis-compatible service, Elasticsearch, and
+MinIO. It uses `speed` mode by default and does not require Supabase login. See `deploy/windows-native/README.md` for
+prerequisites and process-management commands.
+
+::: warning Scope
+Native Windows mode is for development and functional testing. Skill scripts use the `local` sandbox without Docker
+isolation, so this mode is not recommended for production. Ray and some document parsing dependencies also have more
+limited Windows compatibility. The script enables document processing by default; add `-WithoutDataProcess` for a
+lighter chat/configuration-only setup or if those dependencies fail to install.
+:::
+
 ## 🧑‍💻 Full-Stack Nexent Development
 
 ### ⚙️ Infrastructure Deployment

@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 import sys
 import types
@@ -3842,6 +3843,30 @@ class TestCreateModelConfigList:
             assert calls[3][1]['api_key'] == "main_key"
             assert calls[3][1]['model_name'] == "main_model_name"
             assert calls[3][1]['url'] == "http://main.url"
+
+    def test_deepseek_models_disable_thinking_for_tool_rounds(self):
+        """DeepSeek uses non-thinking mode until reasoning_content is persisted."""
+        mock_model_config.reset_mock()
+
+        with patch('backend.agents.create_agent_info.get_model_records') as mock_get_records, \
+                patch('backend.agents.create_agent_info.tenant_config_manager') as mock_manager, \
+                patch('backend.agents.create_agent_info.get_model_name_from_config'), \
+                patch('backend.agents.create_agent_info.add_repo_to_name', return_value='deepseek-v4-flash'):
+            mock_get_records.return_value = [{
+                "display_name": "DeepSeek V4 Flash",
+                "api_key": "test-key",
+                "model_repo": "",
+                "model_name": "deepseek-v4-flash",
+                "base_url": "https://api.deepseek.com",
+                "model_factory": "OpenAI-API-Compatible",
+            }]
+            mock_manager.get_model_config.return_value = {}
+
+            asyncio.run(create_model_config_list("tenant_1"))
+
+        assert mock_model_config.call_args_list[0].kwargs["extra_body"]["thinking"] == {
+            "type": "disabled"
+        }
 
     @pytest.mark.asyncio
     async def test_create_model_config_list_empty_database(self):

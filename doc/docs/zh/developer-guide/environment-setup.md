@@ -18,6 +18,28 @@ title: 环境准备
 项目部署脚本使用 Bash。可以在 Git Bash 或 WSL 中执行部署命令；前端和后端开发命令也可以分别在 PowerShell 中执行。
 :::
 
+### Windows 原生本地测试（不使用 Docker/WSL）
+
+仓库提供 `deploy-windows-native.ps1`，可在 Windows PowerShell 中直接安装应用依赖、初始化数据库并启动
+Nexent 的 Config、Runtime、MCP 和 Web 服务：
+
+```powershell
+# 先检查本机依赖与基础服务
+.\deploy-windows-native.ps1 -Action Doctor
+
+# 完成安装、构建、数据库初始化和启动
+.\deploy-windows-native.ps1
+```
+
+该模式仍需 Windows 本机安装 PostgreSQL、Redis 兼容服务、Elasticsearch 和 MinIO，默认使用 `speed` 模式，
+不依赖 Supabase 登录。详细要求和进程管理命令见仓库中的 `deploy/windows-native/README.zh-CN.md`。
+
+::: warning 使用边界
+原生 Windows 模式面向开发和功能测试。Skill 脚本使用 `local` 沙箱，不具备 Docker 容器隔离，不建议用于生产环境。
+脚本默认安装并启动文档处理服务。Ray 和部分文档解析依赖在 Windows 上的兼容性弱于 Linux；若仅需测试
+对话和智能体配置，或文档处理依赖安装失败，可添加 `-WithoutDataProcess`。
+:::
+
 ## 🧑‍💻 全栈 Nexent 开发
 
 ### ⚙️ 基础设施部署

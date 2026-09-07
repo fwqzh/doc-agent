@@ -88,6 +88,7 @@ _doc/
 .claude/skills/python-import-triage
 /deploy/env/.env
 /deploy/env/.env.bak
+.nexent-windows/
 
 agent_repository_frontend
 .omo/

@@ -86,8 +86,11 @@ AGENT_AUTOMATION_MIN_INTERVAL_SECONDS = int(
 # Container-internal skills storage path
 CONTAINER_SKILLS_PATH = os.getenv("SKILLS_PATH")
 
-# Container-internal official skills ZIP directory
-OFFICIAL_SKILLS_ZIP_PATH = "/mnt/nexent/official-skills-zip"
+# Official skills ZIP directory. Keep the container path as the default while
+# allowing native deployments to provide an operating-system-specific path.
+OFFICIAL_SKILLS_ZIP_PATH = os.getenv(
+    "OFFICIAL_SKILLS_ZIP_PATH", "/mnt/nexent/official-skills-zip"
+)
 
 
 # Preview Configuration
