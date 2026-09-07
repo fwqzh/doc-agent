@@ -325,7 +325,7 @@ function Test-OwnedProcess {
 
 function Stop-NexentProcesses {
     Write-Step "Stopping native Nexent processes"
-    $records = Read-ProcessRecords
+    $records = @(Read-ProcessRecords)
     foreach ($record in $records) {
         if (Test-OwnedProcess -Record $record) {
             Stop-Process -Id $record.pid -Force:$Force
@@ -438,7 +438,7 @@ function Start-NexentProcesses {
 }
 
 function Show-NexentStatus {
-    $records = Read-ProcessRecords
+    $records = @(Read-ProcessRecords)
     if ($records.Count -eq 0) {
         Write-Host "No native Nexent process records were found." -ForegroundColor Yellow
         return

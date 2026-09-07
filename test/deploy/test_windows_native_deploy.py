@@ -22,6 +22,7 @@ class WindowsNativeDeployContractTest(unittest.TestCase):
         self.assertIn('File = "backend\\mcp_service.py"', script)
         self.assertIn('File = "backend\\data_process_service.py"', script)
         self.assertIn('Test-Path (Join-Path $frontendDirectory "pnpm-lock.yaml")', script)
+        self.assertGreaterEqual(script.count("$records = @(Read-ProcessRecords)"), 2)
         self.assertNotIn("docker compose", script.lower())
         self.assertNotIn("wsl.exe", script.lower())
         self.assertIn("DEPLOYMENT_VERSION=speed", environment)
