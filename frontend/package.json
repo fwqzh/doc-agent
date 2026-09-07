@@ -61,7 +61,7 @@
     "react-hook-form": "^7.54.1",
     "react-i18next": "^15.5.3",
     "react-markdown": "^9.0.3",
-    "react-pdf": "10.1.0",
+    "react-pdf": "10.5.0",
     "react-shiki": "^0.10.1",
     "react-syntax-highlighter": "^16.1.0",
     "recharts": "^2.15.0",
