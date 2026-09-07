@@ -589,6 +589,71 @@ def test_call_normal_operation(openai_model_instance):
         assert openai_model_instance.last_output_token_count == 5
 
 
+def test_call_assembles_native_streamed_tool_calls(openai_model_instance):
+    """Fragmented OpenAI tool-call deltas must survive stream aggregation."""
+    messages = [{"role": "user", "content": "Create a document"}]
+
+    first_delta = types.SimpleNamespace(
+        content=None,
+        reasoning_content=None,
+        role="assistant",
+        tool_calls=[types.SimpleNamespace(
+            index=0,
+            id="call_123",
+            type="function",
+            function=types.SimpleNamespace(
+                name="read_skill_",
+                arguments='{"skill_name":"create-',
+            ),
+        )],
+    )
+    second_delta = types.SimpleNamespace(
+        content=None,
+        reasoning_content=None,
+        role=None,
+        tool_calls=[types.SimpleNamespace(
+            index=0,
+            id=None,
+            type=None,
+            function=types.SimpleNamespace(
+                name="md",
+                arguments='docx"}',
+            ),
+        )],
+    )
+    first_chunk = types.SimpleNamespace(
+        choices=[types.SimpleNamespace(delta=first_delta, finish_reason=None)],
+        usage=None,
+    )
+    final_chunk = types.SimpleNamespace(
+        choices=[types.SimpleNamespace(delta=second_delta, finish_reason="tool_calls")],
+        usage=types.SimpleNamespace(prompt_tokens=12, completion_tokens=7),
+    )
+
+    result_message = MagicMock()
+    with patch.object(openai_model_instance, "_prepare_completion_kwargs", return_value={}), \
+            patch.object(mock_models_module.ChatMessage, "from_dict", return_value=result_message) as from_dict:
+        openai_model_instance.client.chat.completions.create.return_value = [
+            first_chunk,
+            final_chunk,
+        ]
+
+        result = openai_model_instance.__call__(messages)
+
+    assert result is result_message
+    payload = from_dict.call_args.args[0]
+    assert payload["content"] == ""
+    assert payload["tool_calls"] == [{
+        "id": "call_123",
+        "type": "function",
+        "function": {
+            "name": "read_skill_md",
+            "arguments": '{"skill_name":"create-docx"}',
+        },
+    }]
+    assert openai_model_instance.last_response_diagnostics["tool_call_count"] == 1
+
+
 def test_call_with_no_think_token_addition(openai_model_instance):
     """Test __call__ method adds /no_think token to user messages"""
 

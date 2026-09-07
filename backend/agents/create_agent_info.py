@@ -881,8 +881,14 @@ def _get_skill_script_tools(
 async def create_model_config_list(tenant_id):
     records = get_model_records({"model_type": "llm"}, tenant_id)
     model_list = []
-    extra_body = {"logprobs": True} if LLM_INCLUDE_LOGPROBS else None
     for record in records:
+        extra_body = {"logprobs": True} if LLM_INCLUDE_LOGPROBS else {}
+        if "api.deepseek.com" in (record.get("base_url") or "").lower():
+            # DeepSeek thinking-mode tool calls require reasoning_content to be
+            # replayed on every subsequent tool round. Nexent's agent memory
+            # currently stores content and tool calls only, so use the fully
+            # supported non-thinking tool-call protocol for reliable execution.
+            extra_body["thinking"] = {"type": "disabled"}
         model_list.append(
             ModelConfig(cite_name=record["display_name"],
                         api_key=record.get("api_key", ""),
@@ -907,7 +913,7 @@ async def create_model_config_list(tenant_id):
                         tokenizer_family=record.get("tokenizer_family"),
                         capacity_source=record.get("capacity_source"),
                         capability_profile_version=record.get("capability_profile_version"),
-                        extra_body=extra_body))
+                        extra_body=extra_body or None))
     # fit for old version, main_model and sub_model use default model
     main_model_config = tenant_config_manager.get_model_config(
         key=MODEL_CONFIG_MAPPING["llm"], tenant_id=tenant_id)

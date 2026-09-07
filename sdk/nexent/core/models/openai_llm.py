@@ -14,7 +14,6 @@ import time
 import json
 from typing import List, Optional, Dict, Any
 
-from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from smolagents import Tool
 from smolagents.models import OpenAIServerModel, ChatMessage, MessageRole
 
@@ -359,6 +358,7 @@ class OpenAIModel(OpenAIServerModel):
                 content_chunk_count = 0
                 reasoning_chunk_count = 0
                 reasoning_char_count = 0
+                streamed_tool_calls: Dict[int, Dict[str, Any]] = {}
                 empty_choices_chunk_count = 0
                 nonstandard_chunk_count = 0
 
@@ -391,9 +391,44 @@ class OpenAIModel(OpenAIServerModel):
                         if chunk_finish_reason is not None:
                             finish_reason = str(chunk_finish_reason)
 
-                        new_token = chunk.choices[0].delta.content
+                        delta = chunk.choices[0].delta
+                        new_token = delta.content
                         reasoning_content = getattr(
-                            chunk.choices[0].delta, 'reasoning_content', None)
+                            delta, 'reasoning_content', None)
+
+                        # OpenAI-compatible providers stream native tool calls as
+                        # fragmented deltas. Preserve and assemble them instead of
+                        # dropping the structured call and trying to parse text.
+                        # Providers such as DeepSeek may return an empty content
+                        # stream whose only useful payload is ``delta.tool_calls``.
+                        for position, tool_delta in enumerate(
+                            getattr(delta, "tool_calls", None) or []
+                        ):
+                            index = getattr(tool_delta, "index", position)
+                            accumulated = streamed_tool_calls.setdefault(
+                                index,
+                                {
+                                    "id": "",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
+                                },
+                            )
+                            tool_call_id = getattr(tool_delta, "id", None)
+                            if tool_call_id:
+                                accumulated["id"] = tool_call_id
+                            tool_call_type = getattr(tool_delta, "type", None)
+                            if tool_call_type:
+                                accumulated["type"] = tool_call_type
+                            function_delta = getattr(tool_delta, "function", None)
+                            if function_delta is not None:
+                                function_name = getattr(function_delta, "name", None)
+                                if function_name:
+                                    accumulated["function"]["name"] += function_name
+                                function_arguments = getattr(
+                                    function_delta, "arguments", None
+                                )
+                                if function_arguments:
+                                    accumulated["function"]["arguments"] += function_arguments
 
                         # Handle reasoning_content if it exists and is not null
                         if reasoning_content is not None:
@@ -430,6 +465,10 @@ class OpenAIModel(OpenAIServerModel):
                     # Send end marker
                     self.observer.flush_remaining_tokens()
                     model_output = "".join(token_join)
+                    assembled_tool_calls = [
+                        streamed_tool_calls[index]
+                        for index in sorted(streamed_tool_calls)
+                    ]
                     self.last_finish_reason = finish_reason
                     if finish_reason == "length":
                         logger.warning(
@@ -500,6 +539,7 @@ class OpenAIModel(OpenAIServerModel):
                         "content_char_count": len(model_output),
                         "reasoning_chunk_count": reasoning_chunk_count,
                         "reasoning_char_count": reasoning_char_count,
+                        "tool_call_count": len(assembled_tool_calls),
                         "empty_choices_chunk_count": empty_choices_chunk_count,
                         "nonstandard_chunk_count": nonstandard_chunk_count,
                         "input_tokens": input_tokens,
@@ -519,7 +559,7 @@ class OpenAIModel(OpenAIServerModel):
                             "chunk_count": len(chunk_list)
                         })
 
-                    if not model_output.strip():
+                    if not model_output.strip() and not assembled_tool_calls:
                         logger.warning(
                             "event=empty_model_response model_id=%s provider=%s "
                             "finish_reason=%s chunk_count=%d content_chunk_count=%d "
@@ -545,9 +585,11 @@ class OpenAIModel(OpenAIServerModel):
                             f"output_tokens={output_tokens})"
                         )
 
-                    message = ChatMessage.from_dict(
-                        ChatCompletionMessage(role=role if role else "assistant",  # If there is no explicit role, default to "assistant"
-                                              content=model_output).model_dump(include={"role", "content", "tool_calls"}))
+                    message = ChatMessage.from_dict({
+                        "role": role if role else "assistant",
+                        "content": model_output,
+                        "tool_calls": assembled_tool_calls or None,
+                    })
 
                     from smolagents.monitoring import TokenUsage
 
