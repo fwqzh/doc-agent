@@ -53,6 +53,21 @@ Manage the native processes:
 .\deploy-windows-native.ps1 -Action Restart
 ```
 
+## Install the SR/AR document agents
+
+This branch bundles the `SR Generation Agent` and `AR Generation Agent` with
+their `sr-generation` and `ar-generation` Skills. After Nexent is running and
+an LLM is configured, run this command from the repository root:
+
+```powershell
+.\install-document-agents-windows.ps1
+```
+
+The installer is idempotent by agent name, reuses an existing same-name Skill,
+and publishes a runnable version after attaching the Skill. Exported database
+model IDs are discarded; the target model is resolved by display name or falls
+back to the Windows quick-config LLM. No API key is stored in the repository.
+
 Disable document processing or enable the optional external API:
 
 ```powershell

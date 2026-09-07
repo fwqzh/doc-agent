@@ -2,6 +2,7 @@
 
 import json
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -61,6 +62,34 @@ class WindowsNativeDeployContractTest(unittest.TestCase):
             package["scripts"]["start"],
             "cross-env NODE_ENV=production node server.js",
         )
+
+    def test_document_agent_installer_and_packages_are_bundled(self):
+        installer = (
+            REPO_ROOT / "install-document-agents-windows.ps1"
+        ).read_text(encoding="utf-8")
+        package_dir = REPO_ROOT / "deploy" / "windows-native" / "agents"
+        expected = {
+            "sr_generation_agent.zip": ("sr_generation_agent", "sr-generation"),
+            "ar_generation_agent.zip": ("ar_generation_agent", "ar-generation"),
+        }
+
+        self.assertIn('agent/$newAgentId/publish', installer)
+        self.assertIn('$agentProperty.Value.model_ids = @()', installer)
+        self.assertIn('action = "use_existing"', installer)
+
+        for filename, (agent_name, skill_name) in expected.items():
+            with self.subTest(package=filename):
+                package = package_dir / filename
+                self.assertTrue(package.is_file())
+                with zipfile.ZipFile(package) as archive:
+                    self.assertEqual(
+                        set(archive.namelist()),
+                        {"agent.json", f"skills/{skill_name}.zip"},
+                    )
+                    agent_data = json.loads(archive.read("agent.json"))
+                    root_agent = agent_data["agent_info"][str(agent_data["agent_id"])]
+                    self.assertEqual(root_agent["name"], agent_name)
+                    self.assertEqual(root_agent["skill_names"], [skill_name])
 
 
 if __name__ == "__main__":

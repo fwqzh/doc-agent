@@ -63,6 +63,19 @@ Remove-Item Env:PGPASSWORD
 .\deploy-windows-native.ps1 -Action Restart
 ```
 
+## 安装 SR/AR 文档智能体
+
+仓库已内置 `SR生成智能体` 和 `AR生成智能体`，并分别捆绑 `sr-generation`、`ar-generation` Skill。
+Nexent 启动并完成大模型配置后，在仓库根目录执行：
+
+```powershell
+.\install-document-agents-windows.ps1
+```
+
+脚本会按名称跳过已经安装的智能体，复用已有同名 Skill，并在导入后发布一个包含 Skill 的可运行版本。
+导出的模型 ID 不会跨数据库复用；脚本优先按显示名称匹配 Windows 已配置模型，匹配不到时使用快速配置中的 LLM。
+脚本不会写入或提交 API Key。
+
 不需要文档处理，或需要外部 API 时：
 
 ```powershell
