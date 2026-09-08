@@ -12,6 +12,7 @@ import {
 import type { CompleteAttachment } from "@assistant-ui/react";
 import { useTranslation } from "react-i18next";
 import { MarkdownText } from "../ui/markdown-text";
+import { SrResultView } from "../ui/sr-result-view";
 import { Reasoning, GroupReasoningTrigger } from "../ui/reasoning";
 import { SubAgentContainer } from "../ui/subagent";
 import { TooltipIconButton } from "../ui/tooltip-icon-button";
@@ -102,6 +103,7 @@ import {
 } from "@/lib/messageDate";
 import { VerificationPanel } from "../ui/verification-panel";
 import { cn } from "@/lib/utils";
+import { parseSrResult } from "@/lib/srResult";
 import { AuthenticatedImage } from "../ui/authenticated-image";
 import { copyToClipboard } from "@/lib/clipboard";
 import { configService } from "@/services/configService";
@@ -1394,6 +1396,10 @@ const AssistantMessage: FC<{
                   isSearchImage?: boolean;
                   imageSource?: SourcePartLike;
                 };
+                const srResult = parseSrResult(textPart.text ?? "");
+                if (srResult) {
+                  return <SrResultView result={srResult} />;
+                }
                 if (textPart.isSearchImage && textPart.imageSource) {
                   return <GlobalSearchImage source={textPart.imageSource} />;
                 }
