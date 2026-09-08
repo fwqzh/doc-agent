@@ -353,6 +353,9 @@ async def _stream_agent_chunks(
     next_unit_index: int = resume_from_unit_index
     # Set when the agent run loop finishes successfully.
     stream_completed_normally: bool = False
+    # A cleanly exhausted generator is not sufficient evidence of success. The
+    # agent protocol must emit a final_answer before the run can be completed.
+    saw_final_answer: bool = False
 
     # Get or create streaming channel for multi-subscriber support
     if channel is None:
@@ -394,6 +397,8 @@ async def _stream_agent_chunks(
                 data = json.loads(chunk)
                 chunk_type = data.get("type")
                 chunk_content = data.get("content", "") or ""
+                if chunk_type == "final_answer":
+                    saw_final_answer = True
 
                 # Add unit_index to the chunk data for frontend resume skip logic.
                 # This allows frontend to accurately skip chunks that were already persisted.
@@ -627,7 +632,17 @@ async def _stream_agent_chunks(
 
             await channel.publish(f"data: {chunk}\n\n")
             yield f"data: {chunk}\n\n"
-        stream_completed_normally = True
+        if saw_final_answer:
+            stream_completed_normally = True
+        else:
+            logger.error(
+                "Agent stream ended without final_answer, conversation=%s agent=%s",
+                agent_request.conversation_id,
+                agent_request.agent_id,
+            )
+            missing_final_answer_chunk = _safe_agent_stream_error_chunk()
+            await channel.publish(missing_final_answer_chunk)
+            yield missing_final_answer_chunk
     except Exception as run_exc:
         logger.error("Agent run error: %r", run_exc, exc_info=True)
         await channel.publish(_safe_agent_stream_error_chunk())

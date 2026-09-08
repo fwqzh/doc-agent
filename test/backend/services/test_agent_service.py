@@ -5250,6 +5250,80 @@ async def test__stream_agent_chunks_persists_and_unregisters(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test__stream_agent_chunks_requires_final_answer(monkeypatch, caplog):
+    """A clean iterator end without final_answer is still a failed run."""
+    agent_request = AgentRequest(
+        agent_id=1,
+        conversation_id=1000,
+        query="hello",
+        history=[],
+        minio_files=[],
+        is_debug=False,
+    )
+
+    async def fake_agent_run(*_, **__):
+        yield json.dumps({"type": "model_output_thinking", "content": "working"})
+
+    persisted_batches = []
+    monkeypatch.setattr(
+        "management.services.agent.run.agent_run", fake_agent_run, raising=False
+    )
+    monkeypatch.setattr(
+        "management.services.agent.run.save_message",
+        MagicMock(return_value=4242),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "management.services.agent.run.persist_assistant_run_batch",
+        lambda **kwargs: persisted_batches.append(kwargs),
+        raising=False,
+    )
+    unregister = MagicMock()
+    monkeypatch.setattr(
+        "management.services.agent.run.agent_run_manager.unregister_agent_run",
+        unregister,
+        raising=False,
+    )
+    complete_channel = AsyncMock()
+    monkeypatch.setattr(
+        "management.services.agent.run.streaming_channel_manager.complete_channel",
+        complete_channel,
+        raising=False,
+    )
+
+    channel = MagicMock()
+    channel.publish = AsyncMock()
+    agent_run_info = MagicMock()
+    agent_run_info.stop_event = asyncio.Event()
+    memory_context = MagicMock()
+    memory_context.user_config.memory_switch = False
+
+    chunks = [
+        chunk
+        async for chunk in agent_run_service._stream_agent_chunks(
+            agent_request,
+            "u",
+            "t",
+            agent_run_info,
+            memory_context,
+            channel=channel,
+        )
+    ]
+
+    assert len(chunks) == 2
+    assert '"type": "error"' in chunks[-1]
+    assert SAFE_AGENT_STREAM_ERROR_MESSAGE in chunks[-1]
+    assert persisted_batches[0]["terminal_status"] == "failed"
+    unregister.assert_called_once_with(
+        1000, "u", status="failed", agent_run_info=agent_run_info
+    )
+    complete_channel.assert_awaited_once_with(
+        conversation_id=1000, user_id="u", status="failed"
+    )
+    assert "Agent stream ended without final_answer" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test__stream_agent_chunks_persists_tool_metadata(monkeypatch):
     """Tool units retain tool name and arguments for historical reloads."""
     agent_request = AgentRequest(
@@ -5334,6 +5408,7 @@ async def test__stream_agent_chunks_does_not_persist_history_summary_event(monke
             "type": "history_summary",
             "content": summary_content,
         })
+        yield json.dumps({"type": "final_answer", "content": "done"})
 
     save_unit = MagicMock(return_value=42)
     monkeypatch.setattr(
@@ -5367,7 +5442,7 @@ async def test__stream_agent_chunks_does_not_persist_history_summary_event(monke
     ):
         chunks.append(chunk)
 
-    assert len(chunks) == 1
+    assert len(chunks) == 2
     assert '"type": "history_summary"' in chunks[0]
     save_unit.assert_not_called()
 
@@ -13038,6 +13113,7 @@ async def test_stream_agent_chunks_buffers_valid_automation_proposals(monkeypatc
             "type": "automation_proposal",
             "content": "invalid proposal payload",
         })
+        yield json.dumps({"type": "final_answer", "content": "proposal ready"})
 
     persisted_batches = []
     channel = MagicMock()
@@ -13052,6 +13128,8 @@ async def test_stream_agent_chunks_buffers_valid_automation_proposals(monkeypatc
     monkeypatch.setattr(agent_run_service.agent_run_manager, "unregister_agent_run", MagicMock())
     monkeypatch.setattr(agent_run_service.streaming_channel_manager, "complete_channel", AsyncMock())
     monkeypatch.setattr(agent_run_service, "_cleanup_channel_later", AsyncMock())
+    memory_context = MagicMock()
+    memory_context.user_config.memory_switch = False
 
     with caplog.at_level("WARNING", logger=agent_service.logger.name):
         chunks = [
@@ -13061,15 +13139,15 @@ async def test_stream_agent_chunks_buffers_valid_automation_proposals(monkeypatc
                 "user1",
                 "tenant1",
                 agent_run_info,
-                MagicMock(),
+                memory_context,
                 channel=channel,
             )
         ]
 
-    assert len(chunks) == 2
+    assert len(chunks) == 3
     assert len(persisted_batches) == 1
     batch = persisted_batches[0]
-    assert [unit["unit_index"] for unit in batch["message_units"]] == [0, 1]
+    assert [unit["unit_index"] for unit in batch["message_units"]] == [0, 1, 2]
     assert batch["automation_proposals"] == [{"unit_index": 0, "proposal_id": 77}]
     assert "Invalid persisted automation proposal event payload" in caplog.text
 
@@ -13093,6 +13171,7 @@ async def test_stream_agent_chunks_logs_search_placeholder_persistence_failure(m
             "type": "search_content",
             "content": json.dumps([{"title": "Result", "url": "https://example.com"}]),
         })
+        yield json.dumps({"type": "final_answer", "content": "search complete"})
 
     monkeypatch.setattr(agent_run_service, "agent_run", fake_agent_run, raising=False)
     monkeypatch.setattr(agent_run_service, "save_message", lambda *args, **kwargs: 4242, raising=False)
@@ -13111,7 +13190,7 @@ async def test_stream_agent_chunks_logs_search_placeholder_persistence_failure(m
             )
         ]
 
-    assert len(collected) == 2
+    assert len(collected) == 3
     assert "search_content" in collected[0]
     assert SAFE_AGENT_STREAM_ERROR_MESSAGE in collected[-1]
     assert "Failed to persist assistant stream batch" in caplog.text

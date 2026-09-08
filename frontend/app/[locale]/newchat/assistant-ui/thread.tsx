@@ -1109,8 +1109,17 @@ const AssistantWorkingIndicator: FC = () => {
 const AssistantCompletionIndicator: FC = () => {
   const { t } = useTranslation();
   const isComplete = useAuiState((s) => s.message.status?.type === "complete");
+  const hasError = useAuiState((s) =>
+    s.message.content.some(
+      (part) =>
+        part.type === "text" &&
+        (part as typeof part & { isError?: boolean }).isError === true,
+    ),
+  );
 
-  if (!isComplete) return null;
+  // assistant-ui marks a consumed stream as complete even when its terminal
+  // event is an application error. Never show a green success badge then.
+  if (!isComplete || hasError) return null;
 
   return (
     <span
