@@ -17,6 +17,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { summarizeSrOutputInReasoning } from "@/lib/srResult";
 
 /**
  * Extracts the step label from the leading markdown heading of a reasoning
@@ -52,7 +53,7 @@ export function normalizeReasoningCodeBlocks(text: string): string {
     }
     const longestBacktickRun = Math.max(
       0,
-      ...Array.from(code.matchAll(BACKTICK_RUN_RE), (match) => match[0].length),
+      ...Array.from(code.matchAll(BACKTICK_RUN_RE), (match) => match[0].length)
     );
     const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
 
@@ -186,7 +187,10 @@ function ReasoningTrigger({
         {...props}
       >
         <BrainIcon className="size-4" />
-        <span>{displayLabel ?? "Reasoning"}{durationText}</span>
+        <span>
+          {displayLabel ?? "Reasoning"}
+          {durationText}
+        </span>
         {active ? (
           <span className="text-muted-foreground text-xs">
             ({thinkingLabel ?? "Thinking..."})
@@ -236,7 +240,10 @@ function ReasoningContent({
 }: React.ComponentProps<"div">) {
   return (
     <CollapsibleContent>
-      <div className={cn("border-t border-border/60 px-3 py-2", className)} {...props}>
+      <div
+        className={cn("border-t border-border/60 px-3 py-2", className)}
+        {...props}
+      >
         {children}
       </div>
     </CollapsibleContent>
@@ -245,7 +252,13 @@ function ReasoningContent({
 
 function ReasoningText({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("text-muted-foreground/90 text-sm leading-relaxed", className)} {...props} />
+    <div
+      className={cn(
+        "text-muted-foreground/90 text-sm leading-relaxed",
+        className
+      )}
+      {...props}
+    />
   );
 }
 
@@ -254,7 +267,9 @@ const StreamingMarkdownSegment = memo(({ content }: { content: string }) => (
     className="aui-md prose prose-sm max-w-none text-sm leading-relaxed text-muted-foreground/90 dark:prose-invert"
     remarkPlugins={[remarkGfm]}
     components={{
-      p: ({ children }) => <p className="my-3 first:mt-0 last:mb-0">{children}</p>,
+      p: ({ children }) => (
+        <p className="my-3 first:mt-0 last:mb-0">{children}</p>
+      ),
       a: ({ children, href }) => (
         <a
           className="text-primary hover:text-primary/80 underline underline-offset-2"
@@ -280,7 +295,9 @@ const StreamingMarkdownSegment = memo(({ content }: { content: string }) => (
       ),
       table: ({ children }) => (
         <div className="my-3 overflow-x-auto">
-          <table className="w-full border-separate border-spacing-0">{children}</table>
+          <table className="w-full border-separate border-spacing-0">
+            {children}
+          </table>
         </div>
       ),
       th: ({ children, align }) => (
@@ -305,7 +322,9 @@ const StreamingMarkdownSegment = memo(({ content }: { content: string }) => (
         </tr>
       ),
       li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+      strong: ({ children }) => (
+        <strong className="font-semibold">{children}</strong>
+      ),
       code: ({ children }) => (
         <code className="bg-muted rounded-md px-1.5 py-0.5 font-mono text-[0.85em]">
           {children}
@@ -326,12 +345,16 @@ StreamingMarkdownSegment.displayName = "StreamingMarkdownSegment";
 
 const StreamingReasoning = () => {
   const text = useAuiState((s) =>
-    s.part?.type === "reasoning" ? s.part.text : "",
+    s.part?.type === "reasoning" ? s.part.text : ""
   );
   const isRunning = useAuiState(
-    (s) => s.part?.type === "reasoning" && s.part.status.type === "running",
+    (s) => s.part?.type === "reasoning" && s.part.status.type === "running"
   );
-  const segments = useMemo(() => splitStreamingReasoning(text), [text]);
+  const visibleText = useMemo(() => summarizeSrOutputInReasoning(text), [text]);
+  const segments = useMemo(
+    () => splitStreamingReasoning(visibleText),
+    [visibleText]
+  );
 
   if (!isRunning) {
     return (
@@ -339,7 +362,9 @@ const StreamingReasoning = () => {
         remarkPlugins={[remarkGfm]}
         className="aui-md prose prose-sm max-w-none dark:prose-invert"
         components={{ ...defaultComponents, img: () => null }}
-        preprocess={normalizeReasoningCodeBlocks}
+        preprocess={(value) =>
+          normalizeReasoningCodeBlocks(summarizeSrOutputInReasoning(value))
+        }
       />
     );
   }
@@ -359,16 +384,18 @@ const StreamingReasoning = () => {
             key={`text-${index}`}
             content={segment.content}
           />
-        ),
+        )
       )}
     </div>
   );
 };
 
-const ReasoningImpl: ReasoningMessagePartComponent = () => <StreamingReasoning />;
+const ReasoningImpl: ReasoningMessagePartComponent = () => (
+  <StreamingReasoning />
+);
 
 const Reasoning = memo(
-  ReasoningImpl,
+  ReasoningImpl
 ) as unknown as ReasoningMessagePartComponent & {
   Root: typeof ReasoningRoot;
   Trigger: typeof ReasoningTrigger;

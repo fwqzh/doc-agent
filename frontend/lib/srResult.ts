@@ -144,3 +144,12 @@ export const parseSrResult = (text: string): SrResultPayload | null => {
     return null;
   }
 };
+
+const SR_OUTPUT_BLOCK_RE = /<sr_output\b[^>]*>[\s\S]*?(?:<\/sr_output>|$)/gi;
+
+/** Keep structured payloads out of the visible reasoning transcript. */
+export const summarizeSrOutputInReasoning = (text: string): string =>
+  text.replace(
+    SR_OUTPUT_BLOCK_RE,
+    "\n\n结构化 SR 结果已生成，请查看下方表格。\n\n"
+  );

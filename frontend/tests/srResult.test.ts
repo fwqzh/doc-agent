@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // @ts-expect-error -- Node's built-in TypeScript runner needs the extension.
-import { parseSrResult } from "../lib/srResult.ts";
+import * as srResultModule from "../lib/srResult.ts";
+
+const { parseSrResult, summarizeSrOutputInReasoning } = srResultModule;
 
 test("parses a structured SR output block", () => {
   const result = parseSrResult(`<sr_output>{
@@ -58,4 +60,17 @@ test("keeps an empty SR result as structured UI data", () => {
   assert.ok(result);
   assert.deepEqual(result.sr_candidates, []);
   assert.deepEqual(result.open_questions, ["请补充输入"]);
+});
+
+test("hides complete and streaming SR payloads from reasoning", () => {
+  assert.equal(
+    summarizeSrOutputInReasoning(
+      '准备结果<sr_output>{"sr_candidates":[]}</sr_output>完成'
+    ),
+    "准备结果\n\n结构化 SR 结果已生成，请查看下方表格。\n\n完成"
+  );
+  assert.equal(
+    summarizeSrOutputInReasoning('<sr_output>{"sr_candidates":['),
+    "\n\n结构化 SR 结果已生成，请查看下方表格。\n\n"
+  );
 });

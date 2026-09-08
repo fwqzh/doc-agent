@@ -875,9 +875,7 @@ const ThreadWelcomeContent: FC<ThreadWelcomeContentProps> = ({
                   <button
                     key={suggestion.id}
                     type="button"
-                    onClick={() =>
-                      handleSampleQuestionClick(suggestion.prompt)
-                    }
+                    onClick={() => handleSampleQuestionClick(suggestion.prompt)}
                     className="flex h-full min-h-20 items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/50"
                   >
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -1115,8 +1113,8 @@ const AssistantCompletionIndicator: FC = () => {
     s.message.content.some(
       (part) =>
         part.type === "text" &&
-        (part as typeof part & { isError?: boolean }).isError === true,
-    ),
+        (part as typeof part & { isError?: boolean }).isError === true
+    )
   );
 
   // assistant-ui marks a consumed stream as complete even when its terminal
@@ -1279,11 +1277,13 @@ const AssistantMessage: FC<{
                 Boolean((part as { image?: string }).image)) ||
               (part.type === "text" &&
                 Boolean(
-                  (part as {
-                    isSearchImage?: boolean;
-                    imageSource?: SourcePartLike;
-                  }).isSearchImage &&
-                    (part as { imageSource?: SourcePartLike }).imageSource
+                  (
+                    part as {
+                      isSearchImage?: boolean;
+                      imageSource?: SourcePartLike;
+                    }
+                  ).isSearchImage &&
+                  (part as { imageSource?: SourcePartLike }).imageSource
                 ));
             const chainPath: `group-${string}`[] = isImagePart
               ? ["group-image"]
