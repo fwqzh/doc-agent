@@ -1,4 +1,5 @@
 import asyncio
+import io
 import pytest
 import sys
 import types
@@ -535,6 +536,8 @@ from backend.agents.create_agent_info import (
     _resolve_input_budget,
     _resolve_safe_input_budget,
     _get_external_provider_service_for_search,
+    _normalize_jsonl_for_prompt,
+    _read_inline_text_attachments,
 )
 
 
@@ -4886,6 +4889,37 @@ class TestJoinMinioFileDescriptionToQuery:
         }
 
         assert _build_internal_s3_url(file) == ""
+
+    def test_normalize_jsonl_for_prompt_preserves_rows_and_flags_errors(self):
+        result = _normalize_jsonl_for_prompt(
+            '{"id": 1, "text": "需求"}\nnot-json\n',
+            "requirements.jsonl",
+        )
+
+        assert '{"id": 1, "text": "需求"}' in result
+        assert "JSONL parse error" in result
+        assert "line 2" in result
+
+    def test_read_inline_text_attachments_reads_markdown_and_jsonl(self):
+        files = [
+            {"name": "context.md", "object_name": "attachments/context.md"},
+            {"name": "requirements.jsonl", "object_name": "attachments/requirements.jsonl"},
+            {"name": "ignored.pdf", "object_name": "attachments/ignored.pdf"},
+        ]
+        streams = [
+            (True, io.BytesIO("# 背景\n内容".encode())),
+            (True, io.BytesIO(b'{"id":"SR-1"}\n')),
+        ]
+
+        with patch.object(create_agent_info_module.minio_client, "get_file_stream", side_effect=streams) as get_stream:
+            result = _read_inline_text_attachments(files)
+
+        assert "### context.md" in result
+        assert "# 背景" in result
+        assert "### requirements.jsonl" in result
+        assert '"id": "SR-1"' in result
+        assert "ignored.pdf" not in result
+        assert get_stream.call_count == 2
 
     @pytest.mark.asyncio
     async def test_join_minio_file_description_to_query_with_files(self):

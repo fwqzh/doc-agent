@@ -1,4 +1,4 @@
- import { resourcesCustom } from "@/app/i18n";
+import { resourcesCustom } from "@/app/i18n";
 
 // Chat related configuration
 export const chatConfig = {
@@ -9,6 +9,8 @@ export const chatConfig = {
     "text/css",
     "text/javascript",
     "application/json",
+    "application/x-ndjson",
+    "application/jsonl",
     "application/xml",
     "text/markdown",
     "text/csv",
@@ -25,6 +27,8 @@ export const chatConfig = {
     "jsx",
     "tsx",
     "json",
+    "jsonl",
+    "ndjson",
     "xml",
     "md",
     "markdown",
@@ -33,7 +37,11 @@ export const chatConfig = {
 
   // File limit configuration
   maxFileCount: 50,
-  maxFileSize: (Number((resourcesCustom?.zh?.custom as any)?.['FILE_UPLOAD_SIZE_LIMIT']) || 10) * 1024 * 1024, // Maximum 10MB - 100MB per file
+  maxFileSize:
+    (Number((resourcesCustom?.zh?.custom as any)?.["FILE_UPLOAD_SIZE_LIMIT"]) ||
+      10) *
+    1024 *
+    1024, // Maximum 10MB - 100MB per file
 
   // Supported image file extensions
   imageExtensions: ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"],
@@ -59,7 +67,15 @@ export const chatConfig = {
   videoExtensions: ["mp4", "mov", "m4v", "avi", "mkv", "webm", "wmv", "flv"],
 
   // Supported text document extensions
-  supportedTextExtensions: ["md", "markdown", "txt", "csv", "json"],
+  supportedTextExtensions: [
+    "md",
+    "markdown",
+    "txt",
+    "csv",
+    "json",
+    "jsonl",
+    "ndjson",
+  ],
 
   // File icon mapping configuration
   fileIcons: {
@@ -100,7 +116,7 @@ export const chatConfig = {
     ],
 
     // JSON files
-    json: ["json"],
+    json: ["json", "jsonl", "ndjson"],
 
     // Compressed file
     compressed: ["zip", "rar", "7z", "tar", "gz"],
@@ -183,8 +199,7 @@ export const chatConfig = {
 
 // Type definitions for better type safety
 export type Opinion =
-  | (typeof chatConfig.opinion)[keyof typeof chatConfig.opinion]
-  | null;
+  (typeof chatConfig.opinion)[keyof typeof chatConfig.opinion] | null;
 export type MessageType =
   (typeof chatConfig.messageTypes)[keyof typeof chatConfig.messageTypes];
 export type ContentType =

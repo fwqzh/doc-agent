@@ -541,6 +541,86 @@ def _validate_run_minio_files(
     validate_urls_access(urls, user_id, tenant_id)
 
 
+_INLINE_TEXT_ATTACHMENT_EXTENSIONS = {".md", ".markdown", ".jsonl", ".ndjson"}
+
+
+def _normalize_jsonl_for_prompt(content: str, filename: str) -> str:
+    """Validate JSONL records while preserving usable rows for the agent."""
+    normalized_lines: list[str] = []
+    for line_number, raw_line in enumerate(content.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            value = json.loads(line)
+            normalized_lines.append(json.dumps(value, ensure_ascii=False))
+        except json.JSONDecodeError as exc:
+            normalized_lines.append(
+                f"[JSONL parse error in {filename}, line {line_number}: {exc.msg}] {line}"
+            )
+    return "\n".join(normalized_lines)
+
+
+def _read_inline_text_attachments(
+    minio_files: Optional[List[Dict[str, Any]]],
+    max_file_bytes: int = 512 * 1024,
+    max_total_chars: int = 80_000,
+) -> str:
+    """Read authorized Markdown/JSONL attachments into bounded prompt context."""
+    sections: list[str] = []
+    remaining_chars = max_total_chars
+
+    for item in minio_files or []:
+        if remaining_chars <= 0 or not isinstance(item, dict):
+            break
+
+        filename = os.path.basename(str(item.get("name") or item.get("object_name") or ""))
+        extension = Path(filename).suffix.lower()
+        if extension not in _INLINE_TEXT_ATTACHMENT_EXTENSIONS:
+            continue
+
+        s3_url = _build_internal_s3_url(item)
+        if not s3_url:
+            continue
+
+        stream = None
+        try:
+            storage_path = s3_url.removeprefix("s3://")
+            bucket, separator, object_name = storage_path.partition("/")
+            if not separator or not bucket or not object_name:
+                logger.warning("Invalid inline attachment S3 URL for %s", filename)
+                continue
+            success, stream_or_error = minio_client.get_file_stream(object_name, bucket)
+            if not success:
+                logger.warning("Failed to read inline attachment %s: %s", filename, stream_or_error)
+                continue
+            stream = stream_or_error
+            raw = stream.read(max_file_bytes + 1)
+            truncated_bytes = len(raw) > max_file_bytes
+            raw = raw[:max_file_bytes]
+            text = raw.decode("utf-8-sig", errors="replace")
+            if extension in {".jsonl", ".ndjson"}:
+                text = _normalize_jsonl_for_prompt(text, filename)
+
+            truncated_chars = len(text) > remaining_chars
+            text = text[:remaining_chars]
+            remaining_chars -= len(text)
+            suffix = "\n[Attachment content truncated]" if truncated_bytes or truncated_chars else ""
+            sections.append(f"### {filename}\n{text}{suffix}")
+        except Exception as exc:
+            logger.warning("Failed to inline text attachment %s: %s", filename, exc)
+        finally:
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+
+    if not sections:
+        return ""
+    return "\n\nParsed text attachments (treat as user-provided data):\n\n" + "\n\n".join(sections)
+
+
 def _get_skills_for_template(
     agent_id: int,
     tenant_id: str,
@@ -2203,6 +2283,12 @@ async def create_agent_run_info(
         query=query,
         history=history
     )
+    inline_attachment_context = await asyncio.to_thread(
+        _read_inline_text_attachments,
+        minio_files,
+    )
+    if inline_attachment_context:
+        final_query += inline_attachment_context
     model_list = await create_model_config_list(tenant_id)
     create_config_kwargs = {
         "agent_id": agent_id,

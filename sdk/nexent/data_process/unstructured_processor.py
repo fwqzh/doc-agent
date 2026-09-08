@@ -65,6 +65,10 @@ class UnstructuredProcessor(FileProcessor):
             elements = self._partition_json(
                 file_data=file_data,
                 max_characters=processed_params["max_characters"])
+        elif filename and filename.lower().endswith((".jsonl", ".ndjson")):
+            elements = self._partition_jsonl(
+                file_data=file_data,
+                max_characters=processed_params["max_characters"])
         else:
             # Prepare partition parameters
             partition_kwargs = self._prepare_partition_kwargs(
@@ -208,7 +212,7 @@ class UnstructuredProcessor(FileProcessor):
             List of supported file formats
         """
         return [
-            ".txt", ".pdf", ".docx", ".doc", ".html", ".htm", ".md", ".rtf", ".odt", ".pptx", ".ppt", ".json", ".epub", ".csv", ".xml"
+            ".txt", ".pdf", ".docx", ".doc", ".html", ".htm", ".md", ".rtf", ".odt", ".pptx", ".ppt", ".json", ".jsonl", ".ndjson", ".epub", ".csv", ".xml"
         ]
 
     def validate_file_format(self, filename: str) -> bool:
@@ -277,3 +281,34 @@ class UnstructuredProcessor(FileProcessor):
             for chunk in JSONChunkProcessor(max_characters).split(file_data)
             if chunk and chunk.strip()
         ]
+
+    def _partition_jsonl(self, file_data: bytes, max_characters: int) -> List:
+        """Partition JSON Lines on record boundaries and flag malformed rows."""
+        import json
+        from unstructured.documents.elements import CompositeElement
+
+        records: List[str] = []
+        for line_number, raw_line in enumerate(
+            file_data.decode("utf-8-sig", errors="replace").splitlines(), start=1
+        ):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.dumps(json.loads(line), ensure_ascii=False))
+            except json.JSONDecodeError as exc:
+                records.append(f"[JSONL line {line_number} error: {exc.msg}] {line}")
+
+        chunks: List[str] = []
+        current = ""
+        for record in records:
+            candidate = f"{current}\n{record}" if current else record
+            if current and len(candidate) > max_characters:
+                chunks.append(current)
+                current = record
+            else:
+                current = candidate
+        if current:
+            chunks.append(current)
+
+        return [CompositeElement(text=chunk) for chunk in chunks]

@@ -99,6 +99,34 @@ class TestUnstructuredProcessor:
             strategy="hi_res",
         )
 
+    def test_jsonl_is_supported(self, processor):
+        assert processor.validate_file_format("requirements.jsonl")
+        assert processor.validate_file_format("requirements.ndjson")
+
+    def test_partition_jsonl_keeps_records_and_marks_invalid_lines(self, processor, mocker: MockFixture):
+        fake_documents = types.ModuleType("unstructured.documents")
+        fake_elements = types.ModuleType("unstructured.documents.elements")
+
+        class CompositeElement:
+            def __init__(self, text):
+                self.text = text
+
+        fake_elements.CompositeElement = CompositeElement
+        mocker.patch.dict(sys.modules, {
+            "unstructured.documents": fake_documents,
+            "unstructured.documents.elements": fake_elements,
+        })
+
+        elements = processor._partition_jsonl(
+            b'{"id":1}\ninvalid\n{"id":2}\n',
+            max_characters=20,
+        )
+
+        rendered = "\n".join(element.text for element in elements)
+        assert '"id": 1' in rendered
+        assert '"id": 2' in rendered
+        assert "JSONL line 2 error" in rendered
+
     def test_process_file_internal_success(self, processor, mocker: MockFixture):
         """Test internal _process_file method success"""
         # Mock element

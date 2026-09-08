@@ -29,7 +29,10 @@ export const getAttachmentType = (file: File): AttachmentType => {
     file.type.includes("word") ||
     file.type.includes("spreadsheet") ||
     file.type.includes("presentation") ||
-    file.type === "application/json"
+    file.type === "application/json" ||
+    file.type === "application/x-ndjson" ||
+    file.type === "application/jsonl" ||
+    /\.(jsonl|ndjson)$/i.test(file.name)
   ) {
     return "document";
   }

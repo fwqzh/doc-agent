@@ -70,6 +70,15 @@ function Import-AgentPackage {
             return
         }
 
+        if ($rootAgent.name -eq "sr_generation_agent") {
+            $uiOutputInstruction = @"
+
+最终响应必须只包含一个 <sr_output>...</sr_output> 块，块内是合法 JSON。sr_candidates 中每条 SR 必须包含简要说明、Actor、前置条件、最小保证、成功保证、触发事件、主成功场景、扩展/异常场景、约束、规格、升级、可靠性、性能、安全、韧性、可服务、可测试、可定位、大于8K连续内存、支持产品、介质引入需求、追溯和审核字段。不要在块外输出长篇文字；前端会用汇总表和可点击详情面板呈现。
+"@
+            $rootAgent.duty_prompt = [string]$rootAgent.duty_prompt + $uiOutputInstruction
+            $rootAgent.constraint_prompt = [string]$rootAgent.constraint_prompt + $uiOutputInstruction
+        }
+
         # Model IDs are database-local. Resolve by display name on Windows,
         # with the configured quick LLM as the backend's final fallback.
         foreach ($agentProperty in $agentData.agent_info.PSObject.Properties) {

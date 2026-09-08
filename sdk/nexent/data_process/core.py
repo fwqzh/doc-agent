@@ -48,6 +48,8 @@ class DataProcessCore:
         ".xlsx",
         ".xls",
         ".json",
+        ".jsonl",
+        ".ndjson",
         ".md",
         ".pdf",
         ".txt",
@@ -284,6 +286,8 @@ class DataProcessCore:
                 ".ppt",
                 ".epub",
                 ".json",
+                ".jsonl",
+                ".ndjson",
                 ".xml",
                 ".csv",
             ]

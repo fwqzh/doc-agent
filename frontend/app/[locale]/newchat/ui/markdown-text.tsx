@@ -12,11 +12,12 @@ import {
 import { useAuiState } from "@assistant-ui/react";
 import { type FC, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, Loader2Icon } from "lucide-react";
 import remarkGfm from "remark-gfm";
 import { defaultUrlTransform, type UrlTransform } from "react-markdown";
 
 import { MermaidDiagram } from "./mermaid-diagram";
+import { SrResultView } from "./sr-result-view";
 
 import { SyntaxHighlighter } from "./shiki-highlighter";
 import { TooltipIconButton } from "./tooltip-icon-button";
@@ -36,6 +37,7 @@ import {
   conversationSourcesRegistry,
   type SearchSource,
 } from "../adapter/remote-chat-model-adapter";
+import { parseSrResult } from "@/lib/srResult";
 
 /**
  * Looks up a SearchSource from either registry by citekey (e.g. "b1" or "1").
@@ -215,6 +217,12 @@ const MarkdownTextImpl = () => {
       part.text.length > 0
     );
   });
+  const textValue = useAuiState((s) =>
+    s.part?.type === "text" && typeof s.part.text === "string"
+      ? s.part.text
+      : ""
+  );
+  const srResult = useMemo(() => parseSrResult(textValue), [textValue]);
   const citationDisplayIndexMap = useMemo(
     () => buildCitationDisplayIndexMap(content),
     [content]
@@ -235,6 +243,30 @@ const MarkdownTextImpl = () => {
 
   if (!isValidTextPart) {
     return null;
+  }
+
+  if (srResult) {
+    return <SrResultView result={srResult} />;
+  }
+
+  if (
+    textValue.toLowerCase().includes("<sr_output>") &&
+    !textValue.toLowerCase().includes("</sr_output>")
+  ) {
+    return (
+      <div className="text-muted-foreground flex items-center gap-2 rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+        <Loader2Icon className="size-4 animate-spin" />
+        正在整理 SR 结果…
+      </div>
+    );
+  }
+
+  if (textValue.toLowerCase().includes("<sr_output>")) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        SR 结构化结果解析失败，请重新生成或检查输出格式。
+      </div>
+    );
   }
 
   return (
