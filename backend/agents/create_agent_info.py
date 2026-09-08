@@ -541,7 +541,21 @@ def _validate_run_minio_files(
     validate_urls_access(urls, user_id, tenant_id)
 
 
-_INLINE_TEXT_ATTACHMENT_EXTENSIONS = {".md", ".markdown", ".jsonl", ".ndjson"}
+_INLINE_TEXT_ATTACHMENT_EXTENSIONS = {
+    ".json",
+    ".jsonl",
+    ".md",
+    ".markdown",
+    ".ndjson",
+}
+
+
+def _normalize_json_for_prompt(content: str, filename: str) -> str:
+    """Normalize JSON for the prompt and preserve malformed input for review."""
+    try:
+        return json.dumps(json.loads(content), ensure_ascii=False, indent=2)
+    except json.JSONDecodeError as exc:
+        return f"[JSON parse error in {filename}: {exc.msg}]\n{content}"
 
 
 def _normalize_jsonl_for_prompt(content: str, filename: str) -> str:
@@ -599,7 +613,9 @@ def _read_inline_text_attachments(
             truncated_bytes = len(raw) > max_file_bytes
             raw = raw[:max_file_bytes]
             text = raw.decode("utf-8-sig", errors="replace")
-            if extension in {".jsonl", ".ndjson"}:
+            if extension == ".json":
+                text = _normalize_json_for_prompt(text, filename)
+            elif extension in {".jsonl", ".ndjson"}:
                 text = _normalize_jsonl_for_prompt(text, filename)
 
             truncated_chars = len(text) > remaining_chars

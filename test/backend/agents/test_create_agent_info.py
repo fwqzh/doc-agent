@@ -536,6 +536,7 @@ from backend.agents.create_agent_info import (
     _resolve_input_budget,
     _resolve_safe_input_budget,
     _get_external_provider_service_for_search,
+    _normalize_json_for_prompt,
     _normalize_jsonl_for_prompt,
     _read_inline_text_attachments,
 )
@@ -4900,14 +4901,25 @@ class TestJoinMinioFileDescriptionToQuery:
         assert "JSONL parse error" in result
         assert "line 2" in result
 
-    def test_read_inline_text_attachments_reads_markdown_and_jsonl(self):
+    def test_normalize_json_for_prompt_preserves_structured_content(self):
+        result = _normalize_json_for_prompt(
+            '{"feature":"元数据修复","items":[1,2]}',
+            "dfs_analysis.json",
+        )
+
+        assert '"feature": "元数据修复"' in result
+        assert '"items": [' in result
+
+    def test_read_inline_text_attachments_reads_supported_text_formats(self):
         files = [
             {"name": "context.md", "object_name": "attachments/context.md"},
+            {"name": "dfs_analysis.json", "object_name": "attachments/dfs_analysis.json"},
             {"name": "requirements.jsonl", "object_name": "attachments/requirements.jsonl"},
             {"name": "ignored.pdf", "object_name": "attachments/ignored.pdf"},
         ]
         streams = [
             (True, io.BytesIO("# 背景\n内容".encode())),
+            (True, io.BytesIO('{"feature":"元数据修复"}'.encode())),
             (True, io.BytesIO(b'{"id":"SR-1"}\n')),
         ]
 
@@ -4916,10 +4928,12 @@ class TestJoinMinioFileDescriptionToQuery:
 
         assert "### context.md" in result
         assert "# 背景" in result
+        assert "### dfs_analysis.json" in result
+        assert '"feature": "元数据修复"' in result
         assert "### requirements.jsonl" in result
         assert '"id": "SR-1"' in result
         assert "ignored.pdf" not in result
-        assert get_stream.call_count == 2
+        assert get_stream.call_count == 3
 
     @pytest.mark.asyncio
     async def test_join_minio_file_description_to_query_with_files(self):
